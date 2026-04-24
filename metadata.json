@@ -1,0 +1,6 @@
+{
+  "name": "NexaOTP Telegram Bot",
+  "description": "একটি টেলিগ্রাম বট যা ভার্চুয়াল নাম্বার এবং OTP পেতে সাহায্য করে। এতে অ্যাডমিন প্যানেল এবং সার্ভিস রেঞ্জ ম্যানেজমেন্ট সুবিধা রয়েছে।",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
