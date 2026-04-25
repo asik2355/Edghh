@@ -13,8 +13,12 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- CONFIGURATION ---
 TOKEN = "7735071779:AAFF5bSVFDgQJY31qkjW38XaVCewdgEtfR4"
+OWNER_ID = 8197284774
 DEFAULT_NEXA_API_KEY = "nxa_9ad17cea99f85040fde8eb4fabdbff6f47f1e613"
 NEXA_BASE_URL = "http://2.58.82.137/api/v1"
+
+# --- DATABASE SETUP ---
+# ... (rest of the file is updated below) ...
 
 # --- DATABASE SETUP ---
 def init_db():
@@ -96,10 +100,11 @@ class Form(StatesGroup):
 dp = Dispatcher(storage=MemoryStorage())
 bot = Bot(token=TOKEN)
 
-def main_menu():
+def main_menu(user_id: int):
     kb = ReplyKeyboardBuilder()
     kb.button(text="📱 Get Number")
-    kb.button(text="⚙️ Admin Panel")
+    if user_id == OWNER_ID:
+        kb.button(text="⚙️ Admin Panel")
     return kb.as_markup(resize_keyboard=True)
 
 def admin_main_menu():
@@ -117,12 +122,12 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     db_query("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,), commit=True)
     
-    # Explicitly check for the requested admin ID
-    if user_id == 8197284774:
+    # Explicitly check for the requested owner ID
+    if user_id == OWNER_ID:
         db_query("INSERT OR IGNORE INTO admins (user_id) VALUES (?)", (user_id,), commit=True)
-        await message.answer("👑 Welcome Master! You have been identified as the Admin.")
+        await message.answer("👑 Welcome Master! You are identified as the Admin.")
     
-    await message.answer("👋 Welcome to NexaOTP Bot! Please select an option:", reply_markup=main_menu())
+    await message.answer("👋 Welcome to NexaOTP Bot! Please select an option:", reply_markup=main_menu(user_id))
 
 @dp.message(F.text == "📱 Get Number")
 async def get_number_menu(message: types.Message):
@@ -137,8 +142,8 @@ async def get_number_menu(message: types.Message):
 
 @dp.message(F.text == "⚙️ Admin Panel")
 async def admin_panel(message: types.Message):
-    is_admin = db_query("SELECT user_id FROM admins WHERE user_id = ?", (message.from_user.id,), fetchone=True)
-    if not is_admin: return await message.answer("❌ Access Denied.")
+    if message.from_user.id != OWNER_ID:
+        return await message.answer("❌ This panel is restricted to the Bot Owner.")
     
     user_count = db_query("SELECT COUNT(*) FROM users", fetchone=True)[0]
     service_count = db_query("SELECT COUNT(*) FROM services", fetchone=True)[0]
