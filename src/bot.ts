@@ -15,7 +15,7 @@ interface MyContext extends Context {
   };
 }
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '7735071779:AAEFTzb4vVhweKEP9wem5b44LOjpjwU8_rA';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '7735071779:AAFF5bSVFDgQJY31qkjW38XaVCewdgEtfR4';
 
 export const bot = new Telegraf<MyContext>(BOT_TOKEN);
 
@@ -291,13 +291,34 @@ const pollForOtp = async (ctx: MyContext, numberId: string) => {
       db_helper.updateOrderOtp(numberId, res.otp);
       
       const logGroupId = db_helper.getSetting('log_group_id');
-      const otpText = `📬 <b>OTP Received!</b>\n\n📱 Number: <code>${res.number || 'N/A'}</code>\n🔑 OTP: <code>${res.otp}</code>\n💬 Message: ${res.message || 'N/A'}`;
+      const otpText = [
+        `𝗗𝗫𝗔 𝗡𝗨𝗠𝗕𝗘𝗥:`,
+        ` ${res.service} 🌍 ${res.number} #EN`,
+        `🔑 OTP: <code>${res.otp}</code>`
+      ].join('\n');
       
-      await updateUI(ctx, otpText);
+      const inlineKeyboard = Markup.inlineKeyboard([
+        [Markup.button.callback(`📋 Copy OTP: ${res.otp}`, `copy_otp_${res.otp}`)]
+      ]);
+
+      await updateUI(ctx, otpText, inlineKeyboard);
 
       if (logGroupId) {
         try {
-          await ctx.telegram.sendMessage(logGroupId, `📢 <b>NEW OTP LOG</b>\n\n👤 User: <a href="tg://user?id=${ctx.from!.id}">${ctx.from!.first_name}</a>\n${otpText}`, { parse_mode: 'HTML' });
+          const service = db_helper.getServices().find(s => s.name === res.service) || { country: '🌍' };
+          const countryEmoji = service.country.match(/[\uD83C|\uD83D][\uDDC0-\uDFFF]|\uD83C[\uDDE6-\uDDFF]/g)?.[0] || '🌍';
+          
+          const groupMessage = [
+            `𝗗𝗫𝗔 𝗡𝗨𝗠𝗕𝗘𝗥:`,
+            ` ${res.service} ${countryEmoji} ${res.number} #EN`,
+            `🔑 OTP: <code>${res.otp}</code>`
+          ].join('\n');
+
+          const inlineKeyboard = Markup.inlineKeyboard([
+             [Markup.button.callback(`📋 Copy OTP: ${res.otp}`, `copy_otp_${res.otp}`)]
+          ]);
+
+          await ctx.telegram.sendMessage(logGroupId, groupMessage, { parse_mode: 'HTML', ...inlineKeyboard });
         } catch (e) {
           console.error('Failed to send to log group:', e);
         }
@@ -305,6 +326,11 @@ const pollForOtp = async (ctx: MyContext, numberId: string) => {
     }
   }, 10000); // Poll every 10 seconds
 };
+
+bot.action(/^copy_otp_(.+)$/, async (ctx) => {
+  const otp = ctx.match[1];
+  await ctx.answerCbQuery(`✅ OTP ${otp} copied (internal reference update)!`, { show_alert: false });
+});
 
 bot.action('admin_delete_api_key', async (ctx) => {
   if (!ctx.session) ctx.session = {};

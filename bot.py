@@ -12,7 +12,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
 
 # --- CONFIGURATION ---
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+TOKEN = "7735071779:AAFF5bSVFDgQJY31qkjW38XaVCewdgEtfR4"
 DEFAULT_NEXA_API_KEY = "nxa_9ad17cea99f85040fde8eb4fabdbff6f47f1e613"
 NEXA_BASE_URL = "http://2.58.82.137/api/v1"
 
@@ -322,20 +322,38 @@ async def poll_otp(callback, number_id):
         if res and res.get('success'):
             otp = res['otp']
             db_query("UPDATE orders SET otp = ?, status = 'completed' WHERE id = ?", (otp, number_id), commit=True)
-            otp_text = (f"📬 <b>OTP Received!</b>\n\n"
-                        f"📱 Number: <code>{res.get('number', 'N/A')}</code>\n"
-                        f"🔑 OTP: <code>{otp}</code>\n"
-                        f"💬 Message: {res.get('message', 'N/A')}")
-            await callback.message.answer(otp_text, parse_mode="HTML")
+            
+            # Message for User Inbox
+            otp_text = (f"𝗗𝗫𝗔 𝗡𝗨𝗠𝗕𝗘𝗥:\n"
+                        f" {res.get('service', 'Service')} 🌍 {res.get('number', 'N/A')} #EN\n"
+                        f"🔑 OTP: <code>{otp}</code>")
+            
+            kb = InlineKeyboardBuilder()
+            kb.button(text=f"📋 Copy OTP: {otp}", callback_data=f"copy_otp_{otp}")
+            
+            await callback.message.answer(otp_text, parse_mode="HTML", reply_markup=kb.as_markup())
             
             if log_group_id:
                 try:
-                    log_text = f"📢 <b>NEW OTP LOG</b>\n\n👤 User: {callback.from_user.full_name}\n{otp_text}"
-                    await bot.send_message(log_group_id, log_text, parse_mode="HTML")
+                    # Message for OTP Group
+                    # Try to extract country emoji from db (simplified check)
+                    service_info = db_query("SELECT country FROM services WHERE name = ?", (res.get('service'),), fetchone=True)
+                    country_emoji = service_info[0] if service_info else "🌍"
+                    
+                    group_message = (f"𝗗𝗫𝗔 𝗡𝗨𝗠𝗕𝗘𝗥:\n"
+                                   f" {res.get('service', 'Service')} {country_emoji} {res.get('number', 'N/A')} #EN\n"
+                                   f"🔑 OTP: <code>{otp}</code>")
+                    
+                    await bot.send_message(log_group_id, group_message, parse_mode="HTML", reply_markup=kb.as_markup())
                 except: pass
             return
         attempts += 1
     await callback.message.answer(f"⏰ Timeout! No OTP received for {number_id}.")
+
+@dp.callback_query(F.data.startswith("copy_otp_"))
+async def copy_otp_handler(callback: types.CallbackQuery):
+    otp = callback.data.split("_")[2]
+    await callback.answer(f"✅ OTP {otp} copied!", show_alert=False)
 
 # --- BROADCAST ---
 @dp.callback_query(F.data == "admin_broadcast")
